@@ -105,7 +105,7 @@ def report(results: list[dict], *, dataset_path: str | Path,
             discrimination = (group["B"]["query_rate"] + group["C"]["query_rate"]
                               - group["A"]["query_rate"] - group["D"]["query_rate"]) / 2
     data = {
-        "protocol": "CMT-2-v0.1",
+        "protocol": meta.get("protocol", "CMT-2-v0.1"),
         "model": meta["backend_model"],
         "dataset_sha256": meta["dataset_sha256"],
         "query_cost": meta["query_cost"],

@@ -29,6 +29,8 @@ def parser() -> argparse.ArgumentParser:
     r.add_argument("--policies", default=",".join(POLICIES))
     r.add_argument("--limit", type=int, default=8, help="Default 8 to prevent unintended API spending")
     r.add_argument("--seed", type=int, default=20261008)
+    r.add_argument("--selection", choices=["prefix", "stratified"], default="prefix",
+                   help="stratified: balanced A/B/C/D selection for small pilots")
     r.add_argument("--query-cost", type=float, default=0.10)
     r.add_argument("--max-api-calls", type=int, default=500)
     r.add_argument("--minimal", action="store_true", help="Do not solicit confidence estimates; type-2 AUROC unavailable")
@@ -66,7 +68,7 @@ def main(argv: list[str] | None = None) -> None:
         results = run_study(tasks, backend, output=args.out, dataset_path=args.dataset,
                             policies=policies, limit=args.limit, seed=args.seed,
                             query_cost=args.query_cost, max_api_calls=args.max_api_calls,
-                            resume=args.resume)
+                            resume=args.resume, selection=args.selection)
         print(json.dumps({"rows": len(results), "cases": len(set(r['case_id'] for r in results)),
                           "backend": backend.model, "actual_api_calls": backend.api_calls,
                           "input_tokens": backend.tokens_in, "output_tokens": backend.tokens_out,

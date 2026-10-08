@@ -13,19 +13,37 @@ from typing import Any
 from .parity import best_query, possibilities
 
 
-INITIAL_PROMPT = """Solve the supplied binary-relation problem.
-Each record asserts that the XOR of two node bits equals 0 or 1. Records are
-not guaranteed to be authentic. The ARCHIVE source supplies a relation, while
-the AUDIT source verifies a record. You may choose one action: answer with your
-current bit, abstain, or inspect ONE listed query ID to receive a local result. Each inspection costs
-0.10 utility points. A correct final answer earns 1 point; a wrong answer or
-abstention earns 0. There is no further tool access. Select the action offering
-the best expected utility. Never invent an unavailable query.
-Do not give explanations. Return only the specified response object."""
+INITIAL_PROMPT = """Solve the supplied binary-relation problem under these
+explicit rules (the same rules apply to every task):
+- Each record (u, v, value) claims bit[u] XOR bit[v] == value, with bits 0 or 1.
+- All records are authentic unless TWO records for the SAME UNORDERED node pair
+  give OPPOSITE values. If this occurs, exactly ONE of those two is false.
+  All other records are authentic. There are no other hidden false records.
+- If no contradictory pair exists, all supplied records are authentic.
+- ARCHIVE returns an authentic relation for a selected pair; AUDIT verifies
+  whether a selected record is authentic. Either source can be consulted via
+  one of the six query IDs, at most ONCE in total.
 
-FINAL_PROMPT = """Solve the same binary-relation problem using the supplied
-single inspection result. No more inspections are possible. Provide the most
-supported final bit, or abstain. Do not give explanations."""
+Your goal is to determine bit[target[0]] XOR bit[target[1]]. You may either:
+answer directly, abstain, or inspect one listed query ID. A correct FINAL bit
+is worth 1 utility point; an incorrect final bit or abstention earns 0.
+Inspection costs 0.10 points, even if the information is irrelevant.
+Choose the action offering the highest expected utility.
+
+Regardless of action, provide your best PROVISIONAL bit in `answer` (0 or 1),
+except `abstain` may use -1. If the output schema has `confidence`, it is the probability that this
+provisional bit is correct, not the probability your action is appropriate.
+When not inspecting, use an empty `query_id`. Do not invent query IDs.
+Do not provide an explanation. Return only the specified response object."""
+
+FINAL_PROMPT = """Solve the same binary-relation problem with ONE inspection
+result. The universal record-authenticity rules still apply: all records are
+true except when a pair of duplicate records for the same unordered pair
+conflict; then exactly one of those two is false, and every other record is
+true. ARCHIVE supplies an authentic relation; AUDIT verifies a record.
+There are no more inspections. Return the most supported final target XOR bit
+(0 or 1), or -1 to abstain. If the output schema has `confidence`, it is the probability this final bit is
+correct (if abstaining, use 0). Do not provide explanations."""
 
 
 def schema(stage: str, elicit_confidence: bool) -> dict:

@@ -7,10 +7,12 @@ never reach a real website.
 from __future__ import annotations
 
 import json
+import hashlib
 import random
 from pathlib import Path
 
 from .data import public_projection, query_oracle, sha256
+from .agent import INITIAL_PROMPT, FINAL_PROMPT
 from .parity import best_query, possibilities
 
 POLICIES = ("adaptive", "direct", "random", "count", "always", "symbolic")
@@ -47,6 +49,32 @@ def _choice(policy: str, public: dict, initial: dict, rng: random.Random) -> str
     raise ValueError(policy)
 
 
+def select_tasks(dataset: list[dict], limit: int, selection: str, seed: int) -> list[dict]:
+    """Case selection is performed locally on sealed labels, never shown to model.
+
+    Balanced selection is for small pilots; `prefix` retains the v0.1 behavior.
+    The selected cases are fixed by seed and recorded by hash for checkpointing.
+    """
+    if selection == "prefix":
+        return dataset[:limit]
+    if selection != "stratified":
+        raise ValueError("selection must be 'prefix' or 'stratified'")
+    if limit % 4:
+        raise ValueError("stratified --limit must be divisible by 4 (minimum 4)")
+    quota = limit // 4
+    buckets = {condition: [] for condition in "ABCD"}
+    for task in dataset:
+        buckets[task["sealed"]["condition"]].append(task)
+    if any(len(group) < quota for group in buckets.values()):
+        raise ValueError("insufficient cases for balanced selection")
+    rng = random.Random(seed)
+    chosen = []
+    for condition in "ABCD":
+        chosen.extend(rng.sample(buckets[condition], quota))
+    rng.shuffle(chosen)
+    return chosen
+
+
 def run_study(
     dataset: list[dict],
     backend,
@@ -59,6 +87,7 @@ def run_study(
     query_cost: float = 0.10,
     max_api_calls: int = 1000,
     resume: bool = False,
+    selection: str = "prefix",
 ) -> list[dict]:
     policies = policies or list(POLICIES)
     if not policies or len(set(policies)) != len(policies) or set(policies) - set(POLICIES):
@@ -70,6 +99,9 @@ def run_study(
     path = Path(output)
     path.parent.mkdir(parents=True, exist_ok=True)
     digest = sha256(dataset_path)
+    selected = select_tasks(dataset, limit, selection, seed)
+    selected_sha256 = hashlib.sha256("\n".join(t["id"] for t in selected).encode()).hexdigest()
+    prompt_sha256 = hashlib.sha256((INITIAL_PROMPT + "\n" + FINAL_PROMPT).encode()).hexdigest()
     meta_path = path.with_suffix(path.suffix + ".meta.json")
     meta = {
         "dataset_sha256": digest,
@@ -79,7 +111,10 @@ def run_study(
         "limit": limit,
         "seed": seed,
         "query_cost": query_cost,
-        "protocol": "CMT-2-v0.1",
+        "protocol": "CMT-2-v0.2-exploratory-post-pilot",
+        "selection": selection,
+        "selected_ids_sha256": selected_sha256,
+        "prompt_sha256": prompt_sha256,
         "shared_initial_response": True,
     }
     if path.exists():
@@ -97,7 +132,7 @@ def run_study(
     seen = {(r["case_id"], r["policy"]) for r in existing}
     # Each case is written as an indivisible batch; any partially written case
     # due to OS crash is refused rather than silently mixing model responses.
-    for task in dataset[:limit]:
+    for task in selected:
         case = task["id"]
         present = {p for k, p in seen if k == case}
         if present == set(policies):
