@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llmcognition"
+version = "0.1.0"
+description = "Controlled OpenAI API experiments on functional metacognitive information-seeking"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{name = "Future Laboratory Research"}]
+dependencies = []
+
+[project.optional-dependencies]
+api = ["openai>=1.70,<4", "python-dotenv>=1,<2"]
+dev = ["pytest>=8,<10"]
+
+[tool.setuptools.packages.find]
+include = ["llmcognition*"]
+
+[project.scripts]
+llmcognition = "llmcognition.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
