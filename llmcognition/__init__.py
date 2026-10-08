@@ -1,3 +1,2 @@
-"""LLMCognition: falsifiable tests of information-seeking metacognitive behavior."""
-
-__version__ = "0.1.0"
+"""CMT-2 compact: reproducible tests of functional metacognition."""
+__version__ = "0.2.1"
